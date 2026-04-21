@@ -1,5 +1,10 @@
 # QuantIAN · Cross-Cloud Market Analytics
 
+[![CI](https://github.com/bhaveshgupta01/CrossCloudAnalyser/actions/workflows/ci.yml/badge.svg)](https://github.com/bhaveshgupta01/CrossCloudAnalyser/actions/workflows/ci.yml)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776ab)
+![Node 20+](https://img.shields.io/badge/node-20%2B-339933)
+![License](https://img.shields.io/badge/license-academic-lightgrey)
+
 QuantIAN is a multi-cloud, peer-to-peer financial analytics platform built for the
 **NYU Cloud Computing course** (csci-ga.3033-026, Prof. Franchitti). Four
 independent services running on AWS, Azure, and GCP discover each other at
@@ -11,6 +16,8 @@ local simulator, published over MQTT, subscribed by the IoT bridge, normalized b
 the AWS peer, scored for anomalies by the Azure peer (rule-based **+ Isolation
 Forest**), aggregated into risk snapshots by the GCP peer (volatility / VaR 95% /
 max drawdown / rolling return), and written block-by-block to the ledger.
+
+![Overview](docs/screenshots/overview.png)
 
 ---
 
@@ -106,16 +113,22 @@ CrossCloudAnalyser/
 ├── web_dashboard/           # React + Vite + Tailwind industrial dashboard
 ├── tests/                   # pytest suite (26 tests)
 ├── scripts/
+│   ├── setup.sh             # one-shot bootstrap (python + node + smoke tests)
 │   ├── run_local_stack.py   # launches all services locally
 │   ├── service_smoke_test.py # end-to-end integration smoke test
 │   ├── cloud_deploy.py      # multi-cloud provisioning (AWS + Azure + GCP)
-│   └── publish_simulation.py # pumps simulated market traffic into ingestion
+│   ├── publish_simulation.py # pumps simulated market traffic into ingestion
+│   └── capture_screenshots.mjs # Puppeteer-based dashboard screenshotter
 ├── docs/
 │   ├── MASTER_TECHNICAL_DOCUMENT.md         # full design / scope / schemas
 │   ├── LIVE_IMPLEMENTATION_TECHNICAL_DOCUMENT.md  # deployed state evidence
 │   ├── P2P_OVERLAY.md                       # the P2P pillar explained
+│   ├── screenshots/                         # PNGs embedded in this README
 │   └── diagrams/                            # draw.io sources
 ├── infra/vm/                # bootstrap script for AWS/GCP VMs
+├── .github/workflows/       # CI: pytest + web typecheck + production build
+├── Makefile                 # common dev commands (`make help`)
+├── .env.example             # documented environment variables
 ├── requirements.txt         # Python dependencies
 ├── pytest.ini
 └── .gitignore
@@ -134,7 +147,41 @@ CrossCloudAnalyser/
 
 ## Local setup — full stack in under 5 minutes
 
-### 1. Clone & install Python deps
+### The fastest path (one command)
+
+```bash
+git clone https://github.com/bhaveshgupta01/CrossCloudAnalyser.git
+cd CrossCloudAnalyser
+bash scripts/setup.sh           # creates .venv, installs deps, smoke tests
+make stack                      # starts broker + 5 peers + streamlit
+# in another terminal:
+make dashboard                  # React dashboard on :5174
+make push-ticks                 # drive 10 MQTT cycles through the pipeline
+```
+
+Then open **http://localhost:5174**.
+
+### Makefile reference
+
+```bash
+make help         # list all targets
+make setup        # first-time setup (python + node)
+make stack        # start broker + all services (with IoT bridge + streamlit)
+make stack-no-iot # start 4 core services only (skip broker + iot-bridge)
+make dashboard    # run React/Vite dev server on :5174
+make push-ticks   # publish 10 cycles of MQTT market data
+make test         # run pytest suite
+make typecheck    # typecheck web dashboard
+make build        # production build of web dashboard
+make status       # health-check all 5 peers
+make screenshots  # capture docs/screenshots/*.png from the running dashboard
+make stop         # kill every QuantIAN listener + broker
+make clean        # stop + wipe runtime state and caches
+```
+
+### Manual setup (step by step)
+
+#### 1. Clone & install Python deps
 
 ```bash
 git clone https://github.com/bhaveshgupta01/CrossCloudAnalyser.git
@@ -145,7 +192,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Install web dashboard deps
+#### 2. Install web dashboard deps
 
 ```bash
 cd web_dashboard
@@ -153,17 +200,20 @@ npm install
 cd ..
 ```
 
-### 3. Start the MQTT broker
+#### 3. Start the MQTT broker
 
 ```bash
 # macOS (Homebrew)
 mosquitto -d -p 1883
 
-# or start as a service
+# or as a service
 brew services start mosquitto
+
+# or Docker (any platform)
+docker run -d --name mosquitto -p 1883:1883 eclipse-mosquitto
 ```
 
-### 4. Start the 5 QuantIAN services
+#### 4. Start the 5 QuantIAN services
 
 The easiest path — one launcher that handles ports, state dir, env vars, and
 (optionally) the IoT bridge:
@@ -237,14 +287,31 @@ injected mid-way. Within seconds you should see:
 
 ### React dashboard (`http://localhost:5174`) — recommended
 
-- **Overview** — KPI strip, per-cloud lanes, live price chart per symbol, latest risk snapshot
-- **Peers** — registered peers with cloud badges, capabilities, heartbeat age
-- **Alerts** — severity/status filters, one-click confirm / false-positive / dismiss
-- **Risk** — 4-metric card strip, multi-line chart of risk history, portfolio weight bars, "Recompute now" button
-- **Ledger** — integrity chip (✓ / ✗), event-type bar chart, scrollable block timeline (hide heartbeats toggle)
-- **IoT** — bridge stats, synthetic-tick injector, MQTT → ingestion flow explanation
-
 Sidebar has a refresh-interval selector (2–60s) and a manual "Refresh now" button.
+
+**Overview** — KPI strip, per-cloud lanes, live price charts per symbol, latest risk snapshot
+
+![Overview](docs/screenshots/overview.png)
+
+**Peers** — registered peers with cloud badges, capabilities, and live heartbeat age
+
+![Peers](docs/screenshots/peers.png)
+
+**Alerts** — severity/status filters with one-click confirm / false-positive / dismiss
+
+![Alerts](docs/screenshots/alerts.png)
+
+**Risk** — 4-metric card strip, multi-line chart of risk history, portfolio weight bars, "Recompute now" button
+
+![Risk](docs/screenshots/risk.png)
+
+**Ledger** — integrity chip (✓ / ✗), event-type bar chart, scrollable block timeline (hide-heartbeats toggle)
+
+![Ledger](docs/screenshots/ledger.png)
+
+**IoT** — bridge stats, synthetic-tick injector, MQTT → ingestion flow explanation
+
+![IoT](docs/screenshots/iot.png)
 
 ### Streamlit dashboard (`http://localhost:8501`) — minimal
 
