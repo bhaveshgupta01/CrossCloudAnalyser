@@ -10,7 +10,8 @@ WEBDIR  := web_dashboard
 BROKER  ?= mqtt://localhost:1883
 
 .PHONY: help setup install-py install-web broker stack stack-no-iot dashboard \
-        test typecheck build screenshots clean stop status push-ticks
+        test typecheck build screenshots clean stop status push-ticks \
+        docker-build docker-up docker-up-ui docker-down docker-logs
 
 help:  ## list available targets
 	@awk 'BEGIN{FS=":.*##"; printf "\n\033[1mQuantIAN\033[0m targets:\n\n"} /^[a-zA-Z_-]+:.*?##/ {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -67,6 +68,21 @@ stop:  ## kill every QuantIAN listener + broker
 	@sleep 1
 	-lsof -ti :8000,8001,8002,8003,8004,8501,5174,1883 2>/dev/null | xargs -r kill -9
 	@echo "stopped"
+
+docker-build:  ## build the QuantIAN image + web dashboard image
+	docker compose build
+
+docker-up:  ## start core stack in docker (mosquitto + 5 peers)
+	docker compose up -d
+
+docker-up-ui:  ## start core stack + streamlit + nginx-served web dashboard
+	docker compose --profile ui up -d --build
+
+docker-down:  ## stop and remove all containers (keeps volumes)
+	docker compose --profile ui down
+
+docker-logs:  ## tail all container logs
+	docker compose logs -f --tail=40
 
 clean: stop  ## stop stack and wipe runtime state + caches
 	rm -rf data/runtime logs .pytest_cache web_dashboard/dist web_dashboard/.vite

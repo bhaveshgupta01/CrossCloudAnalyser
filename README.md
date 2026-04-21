@@ -147,7 +147,7 @@ CrossCloudAnalyser/
 
 ## Local setup — full stack in under 5 minutes
 
-### The fastest path (one command)
+### The fastest path — no Docker (native Python + Node)
 
 ```bash
 git clone https://github.com/bhaveshgupta01/CrossCloudAnalyser.git
@@ -160,6 +160,39 @@ make push-ticks                 # drive 10 MQTT cycles through the pipeline
 ```
 
 Then open **http://localhost:5174**.
+
+### Alternative — everything in Docker (no Python/Node required on host)
+
+Requires Docker Desktop or Docker Engine with the Compose plugin.
+
+```bash
+git clone https://github.com/bhaveshgupta01/CrossCloudAnalyser.git
+cd CrossCloudAnalyser
+
+# core stack only (mosquitto + 5 peers)
+make docker-up
+
+# core stack + both dashboards (streamlit + nginx-served React)
+make docker-up-ui
+
+make docker-logs                # tail everything
+make docker-down                # stop and remove (keeps volumes)
+```
+
+With `docker-up-ui`, dashboards appear at:
+
+- http://localhost:5174 — React/Vite dashboard (served by nginx inside Docker)
+- http://localhost:8501 — Streamlit dashboard
+
+Push some ticks to exercise the stack:
+
+```bash
+PYTHONPATH=$PWD python -m simulator.mqtt_publisher.cli \
+  --mqtt --cycles 10 --delay 1 --broker-url mqtt://localhost:1883
+```
+
+(or run the simulator from inside a container with
+`docker compose run --rm registry python -m simulator.mqtt_publisher.cli --mqtt ...`)
 
 ### Makefile reference
 
@@ -533,11 +566,22 @@ lsof -ti :8000,8001,8002,8003,8004,8501,8502,1883,5174 | xargs kill
 
 ---
 
+## Architecture blueprints
+
+Following the course's blueprinting notation, each view below includes a
+Legend Box (Domain / Scope / Abstraction / State / Author / Date / Type / Status):
+
+1. [Presentation view](docs/blueprints/01-presentation.md) — one-diagram executive summary
+2. [Conceptual view](docs/blueprints/02-conceptual.md) — bounded components and relationships
+3. [Logical view](docs/blueprints/03-logical.md) — services, endpoints, schemas, tick-to-ledger sequence
+4. [Physical view](docs/blueprints/04-physical.md) — AWS / Azure / GCP resource inventory + deployment pipeline
+
 ## Further reading (in this repo)
 
 - [docs/MASTER_TECHNICAL_DOCUMENT.md](docs/MASTER_TECHNICAL_DOCUMENT.md) — full MVP plan, schemas, scope
 - [docs/P2P_OVERLAY.md](docs/P2P_OVERLAY.md) — peer discovery, ledger, auto-verification
 - [docs/LIVE_IMPLEMENTATION_TECHNICAL_DOCUMENT.md](docs/LIVE_IMPLEMENTATION_TECHNICAL_DOCUMENT.md) — current live cloud deployment inventory
+- [docs/blueprints/](docs/blueprints/) — Presentation / Conceptual / Logical / Physical views
 - [docs/diagrams/](docs/diagrams/) — draw.io architecture sources
 
 ---
